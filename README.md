@@ -1,6 +1,6 @@
 # TripSync
 
-React, TypeScript and Vite trip planner with Firebase Authentication and Firestore.
+React, TypeScript trip planner with Firebase Authentication and Firestore.
 
 - Register, sign in and sign out with email/password.
 - Create trips, share a random trip code, join as a signed-in user (up to 8 members).
