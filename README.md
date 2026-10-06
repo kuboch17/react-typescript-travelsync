@@ -8,6 +8,41 @@ React, TypeScript and Vite trip planner with Firebase Authentication and Firesto
 - Trips, activities and votes update in realtime. Only members can access trip data; only the owner can delete a trip.
 - Costs are per person in EUR. JSON export remains available; no import or local demo data.
 
+## A quick walkthrough
+
+Screenshots below show the real app connected to local Firebase emulators, using disposable example accounts and a sample trip. The trip code in the screenshots belongs only to that temporary local session.
+
+### 1. Register or sign in
+
+Create an account with email and password, then sign in. Firebase Authentication supplies the UID used for membership and voting. Sign out is available in the top bar.
+
+| Sign in                                                                | Registration                                                                   |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ![TripSync email and password sign-in screen](docs/firebase-login.jpg) | ![TripSync email and password registration screen](docs/firebase-register.jpg) |
+
+### 2. Share a trip and vote together
+
+Create a trip and share the code shown above the ideas board. Another signed-in user enters it in **Trip code → Join trip**. Members see the same ideas, votes and schedule in realtime. Each vote belongs to the signed-in account; there is no identity switcher.
+
+![Shared Lisbon trip with two authenticated members, a join-code field and UID-based votes](docs/firebase-trip.jpg)
+
+### 3. Build the daily itinerary
+
+Use **Add to plan** on an idea to choose its day, then open **Itinerary**. Other members receive schedule changes automatically.
+
+![TripSync daily itinerary with two scheduled activities](docs/firebase-itinerary.jpg)
+
+### How Firebase login and authorization work
+
+![Diagram of Firebase Authentication, private trip joining and Firestore authorization in TripSync](docs/firebase-authorization.svg)
+
+**Authentication** verifies the account and supplies its Firebase UID. **Authorization** is enforced by Firestore Security Rules on database requests:
+
+- Only trip members can read the trip, activities and votes or edit the plan.
+- A member can create or remove only their own `votes/{uid}` document, giving each account one vote per activity.
+- Only the owner can delete the trip and its sharing code.
+- Joining starts with an authenticated exact code lookup, then an atomic code-proof and membership write. It does not require public trip reads or a public list of codes.
+
 ## Setup
 
 Use Node.js 22.12+ and pnpm 10.11.0. Install with `pnpm install --frozen-lockfile`.
