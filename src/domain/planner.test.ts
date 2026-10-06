@@ -1,10 +1,36 @@
 import { describe, it, expect } from 'vitest';
-import { demoState } from '../data/seed';
+import type { PlannerState } from './model';
+const demoState: PlannerState = {
+  version: 1,
+  trips: [
+    {
+      id: 'lisbon',
+      title: 'Weekend',
+      destination: 'Lisbon',
+      start: '2027-05-15',
+      end: '2027-05-17',
+      ownerUid: 'owner',
+      code: 'a'.repeat(32),
+      members: ['owner', 'u1', 'u2', 'u3'],
+      activities: ['a1', 'a2', 'a3'].map((id) => ({
+        id,
+        title: 'Walk',
+        location: 'River',
+        category: 'Outdoors',
+        cost: 0,
+        notes: '',
+        day: null,
+        votes: id === 'a1' ? ['u1', 'u2', 'u3'] : [],
+      })),
+    },
+  ],
+};
+
 import { plannerReducer } from './planner';
 import { stateSchema, tripDays, tripSchema } from './model';
 describe('planning rules', () => {
   it('toggles a member vote without duplicates or mutating the source', () => {
-    const action = { type: 'vote' as const, tripId: 'lisbon', activityId: 'a1', member: 'Jakub' };
+    const action = { type: 'vote' as const, tripId: 'lisbon', activityId: 'a1', member: 'owner' };
     const next = plannerReducer(demoState, action);
     expect(next.trips[0].activities[0].votes).toHaveLength(4);
     expect(demoState.trips[0].activities[0].votes).toHaveLength(3);
@@ -47,7 +73,7 @@ describe('planning rules', () => {
     const trip = demoState.trips[0];
     expect(tripSchema.safeParse({ ...trip, start: '2027-02-30' }).success).toBe(false);
     expect(tripSchema.safeParse({ ...trip, end: '2027-05-01' }).success).toBe(false);
-    expect(tripSchema.safeParse({ ...trip, members: ['Jakub', 'Jakub'] }).success).toBe(false);
+    expect(tripSchema.safeParse({ ...trip, members: ['owner', 'owner'] }).success).toBe(false);
   });
   it('rejects forged persisted votes and duplicate trip IDs', () => {
     expect(

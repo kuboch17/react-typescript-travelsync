@@ -25,7 +25,9 @@ export const tripSchema = z
     destination: z.string().trim().min(1).max(100),
     start: date,
     end: date,
-    members: z.array(z.string().trim().min(1).max(40)).min(1).max(8),
+    ownerUid: z.string().min(1),
+    code: z.string().regex(/^[a-f0-9]{32}$/),
+    members: z.array(z.string().min(1).max(128)).min(1).max(8),
     activities: z.array(activitySchema),
   })
   .superRefine((trip, ctx) => {
@@ -36,7 +38,7 @@ export const tripSchema = z
         path: ['end'],
       });
     if (new Set(trip.members).size !== trip.members.length)
-      ctx.addIssue({ code: 'custom', message: 'Member names must be unique', path: ['members'] });
+      ctx.addIssue({ code: 'custom', message: 'Member UIDs must be unique', path: ['members'] });
     if (new Set(trip.activities.map((a) => a.id)).size !== trip.activities.length)
       ctx.addIssue({ code: 'custom', message: 'Activity IDs must be unique' });
     for (const activity of trip.activities) {
@@ -58,7 +60,7 @@ export const stateSchema = z
 export type Activity = z.infer<typeof activitySchema>;
 export type Trip = z.infer<typeof tripSchema>;
 export type PlannerState = z.infer<typeof stateSchema>;
-export type TripInput = Pick<Trip, 'title' | 'destination' | 'start' | 'end' | 'members'>;
+export type TripInput = Pick<Trip, 'title' | 'destination' | 'start' | 'end'>;
 export type ActivityInput = Omit<Activity, 'id' | 'votes'>;
 export function daysBetween(start: string, end: string) {
   return (Date.parse(end) - Date.parse(start)) / 86400000;

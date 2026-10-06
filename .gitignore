@@ -6,3 +6,8 @@ dist/
 !.env.example
 coverage/
 .DS_Store
+
+.pnpm-store/
+*-debug.log
+.firebase/
+tests/.tmp/

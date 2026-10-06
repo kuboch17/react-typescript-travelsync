@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function tripPath(id) { return /databases/$(database)/documents/trips/$(id); }
+    function member(id) {
+      return signedIn() && exists(tripPath(id)) && request.auth.uid in get(tripPath(id)).data.members;
+    }
+    function validTrip(t) {
+      return t.keys().hasAll(['title', 'destination', 'start', 'end', 'ownerUid', 'code', 'members'])
+        && t.keys().hasOnly(['title', 'destination', 'start', 'end', 'ownerUid', 'code', 'members'])
+        && t.title is string && t.title.size() > 0 && t.title.size() <= 80
+        && t.destination is string && t.destination.size() > 0 && t.destination.size() <= 100
+        && t.start is string && t.start.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && t.end is string && t.end.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') && t.end >= t.start
+        && t.ownerUid is string && t.code is string && t.code.matches('^[a-f0-9]{32}$')
+        && t.members is list && t.members.size() >= 1 && t.members.size() <= 8
+        && t.members.toSet().size() == t.members.size() && t.ownerUid in t.members;
+    }
+    match /tripCodes/{code} {
+      // A code is a 128-bit bearer capability. Exact lookups only; no enumeration.
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['tripId']) && request.resource.data.tripId is string
+        && getAfter(tripPath(request.resource.data.tripId)).data.ownerUid == request.auth.uid
+        && getAfter(tripPath(request.resource.data.tripId)).data.code == code;
+      allow update: if false;
+      allow delete: if signedIn() && get(tripPath(resource.data.tripId)).data.ownerUid == request.auth.uid
+        && !existsAfter(tripPath(resource.data.tripId));
+    }
+    // Permanent reservations prevent deleted IDs exposing old subcollections.
+    match /tripIds/{id} {
+      allow read, update, delete: if false;
+      allow create: if signedIn() && request.resource.data.keys().hasOnly(['ownerUid'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && getAfter(tripPath(id)).data.ownerUid == request.auth.uid;
+    }
+    match /trips/{id} {
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+      allow create: if signedIn() && validTrip(request.resource.data)
+        && request.resource.data.ownerUid == request.auth.uid && request.resource.data.members == [request.auth.uid]
+        && !exists(/databases/$(database)/documents/tripIds/$(id))
+        && getAfter(/databases/$(database)/documents/tripIds/$(id)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/tripCodes/$(request.resource.data.code)).data.tripId == id;
+      allow update: if signedIn() && validTrip(request.resource.data) && (
+        (request.auth.uid in resource.data.members
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'destination', 'start', 'end']))
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
+          && request.resource.data.members.toSet() == resource.data.members.toSet().union([request.auth.uid].toSet())
+          && getAfter(/databases/$(database)/documents/trips/$(id)/joins/$(request.auth.uid)).data.code == resource.data.code)
+      );
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid
+        && !existsAfter(/databases/$(database)/documents/tripCodes/$(resource.data.code));
+      match /joins/{uid} {
+        allow read: if member(id);
+        allow create: if signedIn() && uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['code']) && request.resource.data.code is string
+          && get(/databases/$(database)/documents/tripCodes/$(request.resource.data.code)).data.tripId == id
+          && uid in getAfter(tripPath(id)).data.members;
+        allow update: if member(id) && uid == request.auth.uid && request.resource.data == resource.data;
+        allow delete: if false;
+      }
+      match /activityIds/{activityId} {
+        allow read, update, delete: if false;
+        allow create: if member(id) && request.resource.data.keys().hasOnly(['uid'])
+          && request.resource.data.uid == request.auth.uid
+          && existsAfter(/databases/$(database)/documents/trips/$(id)/activities/$(activityId));
+      }
+      match /activities/{activityId} {
+        function validActivity(a) {
+          return a.keys().hasAll(['title', 'location', 'category', 'cost', 'notes', 'day'])
+            && a.keys().hasOnly(['title', 'location', 'category', 'cost', 'notes', 'day'])
+            && a.title is string && a.title.size() > 0 && a.title.size() <= 100
+            && a.location is string && a.location.size() > 0 && a.location.size() <= 120
+            && a.category in ['Food & drink', 'Culture', 'Outdoors', 'Experience']
+            && a.cost is number && a.cost >= 0 && a.cost <= 100000
+            && a.notes is string && a.notes.size() <= 500
+            && (a.day == null || (a.day is string && a.day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+              && a.day >= get(tripPath(id)).data.start && a.day <= get(tripPath(id)).data.end));
+        }
+        allow read: if member(id);
+        allow create: if member(id) && validActivity(request.resource.data)
+          && !exists(/databases/$(database)/documents/trips/$(id)/activityIds/$(activityId))
+          && getAfter(/databases/$(database)/documents/trips/$(id)/activityIds/$(activityId)).data.uid == request.auth.uid;
+        allow update: if member(id) && validActivity(request.resource.data);
+        allow delete: if member(id);
+        match /votes/{uid} {
+          function activeMember() {
+            return member(id) && exists(/databases/$(database)/documents/trips/$(id)/activities/$(activityId));
+          }
+          allow read: if activeMember();
+          allow create: if activeMember() && uid == request.auth.uid
+            && request.resource.data.keys().hasOnly(['uid']) && request.resource.data.uid == uid;
+          allow update: if false;
+          allow delete: if activeMember() && uid == request.auth.uid;
+        }
+      }
+    }
+  }
+}

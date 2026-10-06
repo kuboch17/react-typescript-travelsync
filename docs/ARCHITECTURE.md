@@ -1,48 +1,25 @@
-# MVP and architecture
+# TripSync architecture
 
-## Product scope
+The UI submits typed commands through `usePlanner` to `firebaseRepository`. Zod validates forms and new documents; Firestore Security Rules independently enforce access and writable fields. The pure domain reducer stays available for domain tests. UI state (selection, filter, search, active tab) is not stored in Firestore.
 
-The MVP supports one complete journey: create a trip → collect suggestions → compare group preferences → schedule the favourites. Local browser persistence makes the demo usable immediately and keeps backend setup out of the first learning milestone. Demo voting uses named companions and must never be treated as authentication.
+Firebase Auth supplies the signed-in UID. Signed-out users only see the authentication form. Missing Web app configuration displays setup instructions. Auth session persistence is managed by Firebase; planner data has no localStorage fallback or sample identities.
 
-The initial release excludes bookings, maps, chat, invitations, accounts, realtime updates, and currency conversion. Activity costs are estimates per person in EUR. Trips are limited to 31 inclusive days to keep the itinerary usable.
-
-## Layers and data flow
-
-React components submit typed actions → `plannerReducer` applies immutable changes → Zod validates the next state → `usePlanner` updates React and asks the repository to persist it.
-
-The domain layer has no React or browser dependencies. `PlannerAction` is a discriminated union; `Trip` and `Activity` are inferred from the runtime schemas to avoid drifting between validation and static types. UI-only state (selected trip, category, search, identity, active tab) stays outside persisted data.
-
-`PlannerRepository` isolates loading and saving. The browser implementation uses a versioned snapshot and validates it on load. Invalid stored data falls back to cloned samples and shows a warning without immediately replacing the original bytes. A subsequent explicit mutation saves the new snapshot. Failed saves retain session state and show an export warning. Stored data is local to the origin and browser; clearing site data removes it. Multiple open tabs are not synchronized and may overwrite one another; use one tab for this MVP.
-
-Dates are ISO calendar strings. Validation rejects nonexistent dates, reversed ranges, oversized trips, duplicate IDs, duplicate companions/votes, nonmember votes, and dates outside the trip. Day enumeration and presentation use UTC to avoid timezone/DST drift. The sum displayed in the header includes scheduled activities only.
-
-Changing trip dates while an activity is scheduled outside the proposed range is rejected. Unplan that activity first. Removing a companion also removes their votes. Deleting an idea immediately removes its votes and schedule; deleting an entire trip requires confirmation.
-
-## Realtime milestone (planned, not implemented)
-
-Firebase changes the persistence model substantially; swapping the synchronous repository alone is insufficient.
-
-Suggested Firestore layout:
+## Firestore layout
 
 ```text
-trips/{tripId}                        title, destination, dates, ownerUid
-trips/{tripId}/members/{uid}          displayName, role
-trips/{tripId}/activities/{activityId} title, place, category, cost, notes, day
-trips/{tripId}/activities/{id}/votes/{uid} createdAt
+trips/{id}                               title, destination, start, end, ownerUid, code, members: UID[]
+tripCodes/{128-bit random hex code}       tripId
+trips/{id}/joins/{uid}                    code
+trips/{id}/activities/{activityId}        title, location, category, cost, notes, day
+trips/{id}/activities/{activityId}/votes/{uid}  uid
 ```
 
-1. Introduce Firebase Auth. Use UIDs for membership and voting; display names are presentation only.
-2. Replace full-snapshot saves with asynchronous command methods and `subscribe(tripId, listener)`. Add pending/loading/error states and unsubscribe on trip change or unmount.
-3. Require trip membership in security rules for reads and writes. Restrict membership management to the owner. Only the authenticated voter can create/delete their vote document. Validate writable fields, dates, numeric bounds, and allowed categories.
-4. Use UID-keyed vote documents for uniqueness. Use transactions where a command depends on shared state; avoid writing an entire trip to toggle a vote.
-5. Add a membership invitation flow, then test rules and two-client changes using emulators. Test nonmembers, forged identities, owner permissions, concurrent updates, and reconnects.
+The member-filtered trip query and activity/vote collections use `onSnapshot`. Listeners are detached on removal, sign out and unmount. Session UID guards keep one user's state out of another user's view. Commands await server acceptance; failed saves leave dialogs open and show an error. Concurrent commands use granular fields; votes toggle in a transaction.
 
-Do not store credentials in source control. Client Firebase configuration does not replace security rules. The current demo identity selector must be removed from a deployed authenticated version.
+Creating a trip atomically creates its unique code document. A signed-in joiner gets that exact code document (listing is forbidden) and atomically creates a self-owned code proof plus `arrayUnion(uid)` on the trip, without reading private trip data. Rules validate the code and final membership with `getAfter`. Existing members can rejoin idempotently; callers cannot add someone else or edit the owner/code. Owner-only deletion atomically removes the parent and code. Orphaned subcollections are denied by parent-existence checks; physical cleanup is outside the MVP.
 
-## Validation strategy
+Dates are ISO calendar strings, displayed in UTC. Client validation checks real dates, 31-day maximum and schedules within the proposed trip range. Rules check date shape/order and activity dates against current trip bounds. When shortening a trip, unplan any activities outside the new range first. Members may edit ideas and the plan; only their own vote can be created/deleted. UID-keyed vote documents ensure one vote per activity and user.
 
-Pure domain tests check planning invariants and immutability; repository tests check recovery and denied access; React interaction tests cover actual user workflows. Strict TypeScript and Vite production build run in CI. Browser checks inspect desktop/mobile layouts and representative interactions.
+Unit tests cover domain invariants; UI tests cover auth, UID voting, joining and failed saves. Emulator tests validate actual rules and attack cases. CI runs all tests and production build. Firebase project provisioning and production configuration are manual setup steps.
 
-## Interview discussion
-
-Explain why UI state differs from domain state, why TypeScript cannot validate localStorage, how immutable transitions improve testing, how date-only handling avoids DST errors, and why real collaboration requires authorization and granular concurrent writes.
+Permanent `tripIds` and `activityIds` reservations prevent reusing deleted IDs to expose old subcollections or resurrect votes. These markers cannot be read, edited or deleted by clients.

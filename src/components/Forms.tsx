@@ -7,7 +7,17 @@ import {
   type TripInput,
   type ActivityInput,
 } from '../domain/model';
-export function TripForm({ trip, onSave }: { trip?: Trip; onSave: (input: TripInput) => void }) {
+export function TripForm({
+  trip,
+  uid,
+  pending,
+  onSave,
+}: {
+  trip?: Trip;
+  uid: string;
+  pending?: boolean;
+  onSave: (input: TripInput) => void;
+}) {
   const [error, setError] = useState('');
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -17,17 +27,15 @@ export function TripForm({ trip, onSave }: { trip?: Trip; onSave: (input: TripIn
       destination: String(f.get('destination')),
       start: String(f.get('start')),
       end: String(f.get('end')),
-      members: String(f.get('members'))
-        .split(',')
-        .map((m) => m.trim())
-        .filter(Boolean),
     };
-    // Preserve existing votes; removing a demo member also removes their votes.
-    const activities = (trip?.activities ?? []).map((a) => ({
-      ...a,
-      votes: a.votes.filter((v) => input.members.includes(v)),
-    }));
-    const result = tripSchema.safeParse({ ...input, id: trip?.id ?? 'new', activities });
+    const result = tripSchema.safeParse({
+      ...input,
+      id: trip?.id ?? 'new',
+      ownerUid: trip?.ownerUid ?? uid,
+      code: trip?.code ?? '0'.repeat(32),
+      members: trip?.members ?? [uid],
+      activities: trip?.activities ?? [],
+    });
     if (!result.success) {
       setError(result.error.issues[0].message);
       return;
@@ -37,7 +45,6 @@ export function TripForm({ trip, onSave }: { trip?: Trip; onSave: (input: TripIn
       destination: result.data.destination,
       start: result.data.start,
       end: result.data.end,
-      members: result.data.members,
     });
   }
   return (
@@ -72,28 +79,24 @@ export function TripForm({ trip, onSave }: { trip?: Trip; onSave: (input: TripIn
           <input name="end" type="date" defaultValue={trip?.end} required />
         </label>
       </div>
-      <label>
-        Travel companions
-        <input
-          name="members"
-          defaultValue={trip?.members.join(', ') ?? 'Jakub'}
-          maxLength={300}
-          required
-        />
-        <small>Up to 8 names, separated by commas.</small>
-      </label>
       {error && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
-      <button className="primary" type="submit">
+      <button className="primary" type="submit" disabled={pending}>
         {trip ? 'Save trip' : 'Create trip'}
       </button>
     </form>
   );
 }
-export function ActivityForm({ onSave }: { onSave: (input: ActivityInput) => void }) {
+export function ActivityForm({
+  onSave,
+  pending,
+}: {
+  pending?: boolean;
+  onSave: (input: ActivityInput) => void;
+}) {
   const [error, setError] = useState('');
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -156,7 +159,7 @@ export function ActivityForm({ onSave }: { onSave: (input: ActivityInput) => voi
           {error}
         </p>
       )}
-      <button className="primary" type="submit">
+      <button className="primary" type="submit" disabled={pending}>
         Add idea
       </button>
     </form>

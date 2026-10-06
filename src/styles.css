@@ -771,3 +771,11 @@ footer {
     scroll-behavior: auto !important;
   }
 }
+
+.auth-panel { max-width: 440px; margin: 10vh auto; padding: 28px; background: white; border-radius: 16px; }
+.join-form { display: grid; gap: 10px; margin: 20px 0; }
+.join-form label { display: grid; gap: 6px; font-size: 13px; }
+.join-form input { width: 100%; min-width: 0; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+.collaboration-row code { overflow-wrap: anywhere; user-select: all; }
+button:disabled { opacity: .6; cursor: wait; }
+.topbar { flex-wrap: wrap; gap: 10px; }

@@ -12,6 +12,9 @@ import {
   Check,
   Users,
 } from 'lucide-react';
+import { useAuth } from './hooks/useAuth';
+import { configured } from './data/firebase';
+import { AuthForm } from './components/AuthForm';
 import { usePlanner } from './hooks/usePlanner';
 import {
   categories,
@@ -26,9 +29,13 @@ import { TripForm, ActivityForm } from './components/Forms';
 import { ActivityCard } from './components/ActivityCard';
 type Dialog = 'new-trip' | 'edit-trip' | 'idea' | 'delete-trip' | null;
 export default function App() {
-  const { state, dispatch, warning } = usePlanner();
-  const [selected, setSelected] = useState('lisbon');
-  const [identity, setIdentity] = useState('Jakub');
+  const session = useAuth();
+  const { state, dispatch, warning, loading, pending, join } = usePlanner(
+    session.user?.uid ?? null,
+  );
+  const [joinCode, setJoinCode] = useState('');
+  const [selected, setSelected] = useState('');
+
   const [view, setView] = useState<'ideas' | 'itinerary'>('ideas');
   const [filter, setFilter] = useState('All ideas');
   const [query, setQuery] = useState('');
@@ -36,7 +43,7 @@ export default function App() {
   const [dialog, setDialog] = useState<Dialog>(null);
   const close = useCallback(() => setDialog(null), []);
   const trip = state.trips.find((t) => t.id === selected) ?? state.trips[0];
-  const member = trip?.members.includes(identity) ? identity : (trip?.members[0] ?? '');
+  const member = session.user?.uid ?? '';
   const planned = trip?.activities.filter((a) => a.day) ?? [];
   const activities = useMemo(
     () =>
@@ -50,35 +57,36 @@ export default function App() {
       [],
     [trip, filter, query, sort],
   );
-  function saveTrip(input: TripInput) {
-    if (dialog === 'edit-trip' && trip)
-      dispatch({
-        type: 'update-trip',
-        trip: {
-          ...trip,
-          ...input,
-          activities: trip.activities.map((a) => ({
-            ...a,
-            votes: a.votes.filter((v) => input.members.includes(v)),
-          })),
-        },
-      });
-    else {
+  async function saveTrip(input: TripInput) {
+    if (!session.user) return;
+    if (dialog === 'edit-trip' && trip) {
+      if (await dispatch({ type: 'update-trip', trip: { ...trip, ...input } })) close();
+    } else {
       const id = crypto.randomUUID();
-      dispatch({ type: 'create-trip', trip: { ...input, id, activities: [] } });
-      setSelected(id);
-      setIdentity(input.members[0]);
+      const code = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+        byte.toString(16).padStart(2, '0'),
+      ).join('');
+      if (
+        await dispatch({
+          type: 'create-trip',
+          trip: { ...input, id, ownerUid: member, code, members: [member], activities: [] },
+        })
+      ) {
+        setSelected(id);
+        close();
+      }
     }
-    close();
   }
-  function saveIdea(input: ActivityInput) {
-    if (trip)
-      dispatch({
+  async function saveIdea(input: ActivityInput) {
+    if (
+      trip &&
+      (await dispatch({
         type: 'add-activity',
         tripId: trip.id,
         activity: { ...input, id: crypto.randomUUID(), votes: [] },
-      });
-    close();
+      }))
+    )
+      close();
   }
   function exportBackup() {
     const url = URL.createObjectURL(
@@ -96,6 +104,26 @@ export default function App() {
     setQuery('');
     setView('ideas');
   }
+  if (!configured)
+    return (
+      <section className="auth-panel">
+        <h1>TripSync setup</h1>
+        <p>
+          Firebase configuration is missing. Copy .env.example to .env.local, fill in your Firebase
+          web app values and restart. See README for setup.
+        </p>
+      </section>
+    );
+  if (session.loading)
+    return (
+      <p className="empty" role="status">
+        Loading session…
+      </p>
+    );
+  if (!session.user)
+    return (
+      <AuthForm onSubmit={session.authenticate} pending={session.pending} error={session.error} />
+    );
   return (
     <div className="app-shell">
       <a className="skip" href="#main">
@@ -114,6 +142,31 @@ export default function App() {
             <Plus size={20} />
           </button>
         </div>
+        <form
+          className="join-form"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const id = await join(joinCode.trim().toLowerCase());
+            if (id) {
+              selectTrip(id);
+              setJoinCode('');
+            }
+          }}
+        >
+          <label>
+            Trip code
+            <input
+              aria-label="Trip code"
+              value={joinCode}
+              onChange={(event) => setJoinCode(event.target.value)}
+              required
+              maxLength={32}
+            />
+          </label>
+          <button className="outline" disabled={pending}>
+            Join trip
+          </button>
+        </form>
         <nav aria-label="Your trips">
           {state.trips.map((t) => (
             <button
@@ -138,6 +191,17 @@ export default function App() {
             My trips <span>/</span>{' '}
             <strong>{trip?.destination.split(',')[0] ?? 'New adventure'}</strong>
           </div>
+          <span>{session.user.email}</span>
+          <button
+            className="text-button"
+            disabled={session.pending}
+            onClick={() => {
+              close();
+              void session.logout();
+            }}
+          >
+            Sign out
+          </button>
           <button className="text-button" onClick={exportBackup}>
             <Download size={16} />
             Export backup
@@ -249,19 +313,10 @@ export default function App() {
                   </button>
                 </div>
                 <div className="collaboration-row">
-                  <label>
-                    <Users size={14} />
-                    Demo voter
-                    <select
-                      aria-label="Demo voting identity"
-                      value={member}
-                      onChange={(e) => setIdentity(e.target.value)}
-                    >
-                      {trip.members.map((m) => (
-                        <option key={m}>{m}</option>
-                      ))}
-                    </select>
-                  </label>
+                  <Users size={14} />
+                  <span>
+                    {trip.members.length} members · Share trip code: <code>{trip.code}</code>
+                  </span>
                 </div>
                 <div
                   id="planning-panel"
@@ -384,26 +439,28 @@ export default function App() {
                 </div>
               </section>
               <footer>
-                <span>Local demo · browser only</span>
-                <button className="text-button danger" onClick={() => setDialog('delete-trip')}>
-                  <Trash2 size={13} />
-                  Delete trip
-                </button>
+                <span>Realtime · Firebase</span>
+                {trip.ownerUid === member && (
+                  <button className="text-button danger" onClick={() => setDialog('delete-trip')}>
+                    <Trash2 size={13} />
+                    Delete trip
+                  </button>
+                )}
               </footer>
             </>
           ) : (
             <section className="empty-workspace">
               <Compass size={48} />
-              <h1>No trips yet</h1>
+              <h1>{loading ? 'Loading trips…' : 'No trips yet'}</h1>
               <button className="primary" onClick={() => setDialog('new-trip')}>
                 <Plus size={17} />
                 Create trip
               </button>
             </section>
           )}
-          {warning && (
+          {(warning || session.error) && (
             <div className="warning" role="alert">
-              {warning}
+              {warning || session.error}
             </div>
           )}
         </main>
@@ -422,9 +479,14 @@ export default function App() {
           onClose={close}
         >
           {dialog === 'new-trip' || dialog === 'edit-trip' ? (
-            <TripForm trip={dialog === 'edit-trip' ? trip : undefined} onSave={saveTrip} />
+            <TripForm
+              pending={pending}
+              uid={member}
+              trip={dialog === 'edit-trip' ? trip : undefined}
+              onSave={saveTrip}
+            />
           ) : dialog === 'idea' ? (
-            <ActivityForm onSave={saveIdea} />
+            <ActivityForm pending={pending} onSave={saveIdea} />
           ) : (
             <>
               <p>The trip and its ideas will be deleted.</p>
@@ -434,9 +496,9 @@ export default function App() {
                 </button>
                 <button
                   className="primary destructive"
-                  onClick={() => {
-                    if (trip) dispatch({ type: 'delete-trip', tripId: trip.id });
-                    close();
+                  disabled={pending}
+                  onClick={async () => {
+                    if (trip && (await dispatch({ type: 'delete-trip', tripId: trip.id }))) close();
                   }}
                 >
                   Delete trip
