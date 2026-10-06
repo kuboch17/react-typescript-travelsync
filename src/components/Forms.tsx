@@ -46,7 +46,7 @@ export function TripForm({ trip, onSave }: { trip?: Trip; onSave: (input: TripIn
         Trip name
         <input
           name="title"
-          placeholder="A long weekend in…"
+          placeholder="Trip name"
           defaultValue={trip?.title}
           maxLength={80}
           required
@@ -80,7 +80,7 @@ export function TripForm({ trip, onSave }: { trip?: Trip; onSave: (input: TripIn
           maxLength={300}
           required
         />
-        <small>Comma-separated names, up to 8. Demo identities, no accounts.</small>
+        <small>Up to 8 names, separated by commas.</small>
       </label>
       {error && (
         <p className="form-error" role="alert">
@@ -123,7 +123,7 @@ export function ActivityForm({ onSave }: { onSave: (input: ActivityInput) => voi
       </label>
       <label>
         Place
-        <input name="location" placeholder="A place or neighbourhood" maxLength={120} required />
+        <input name="location" placeholder="Place" maxLength={120} required />
       </label>
       <div className="form-row">
         <label>
@@ -148,13 +148,8 @@ export function ActivityForm({ onSave }: { onSave: (input: ActivityInput) => voi
         </label>
       </div>
       <label>
-        A little more detail
-        <textarea
-          name="notes"
-          placeholder="Good to know, opening hours, or why we should go…"
-          maxLength={500}
-          rows={3}
-        />
+        Notes
+        <textarea name="notes" placeholder="Optional" maxLength={500} rows={3} />
       </label>
       {error && (
         <p className="form-error" role="alert">

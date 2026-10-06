@@ -1,9 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  Mountain,
   Plus,
   MapPin,
-  ArrowUpRight,
   Compass,
   CalendarDays,
   Lightbulb,
@@ -104,25 +102,16 @@ export default function App() {
         Skip to trip
       </a>
       <aside className="sidebar">
-        <a href="#" className="brand" aria-label="TripSync home">
-          <span className="brand-icon">
-            <Mountain size={22} />
-          </span>
-          TripSync<span className="brand-dot">.</span>
-        </a>
-        <p className="sidebar-label">YOUR WORKSPACE</p>
-        <div className="workspace">
-          <Compass size={18} />
-          My trips<span>{state.trips.length}</span>
-        </div>
         <div className="sidebar-heading">
-          <p className="sidebar-label">UPCOMING ADVENTURES</p>
+          <h2>
+            <Compass size={20} /> My trips
+          </h2>
           <button
             className="icon-button"
             aria-label="Create trip"
             onClick={() => setDialog('new-trip')}
           >
-            <Plus size={17} />
+            <Plus size={20} />
           </button>
         </div>
         <nav aria-label="Your trips">
@@ -132,13 +121,7 @@ export default function App() {
               className={`trip-nav ${trip?.id === t.id ? 'active' : ''}`}
               onClick={() => selectTrip(t.id)}
             >
-              <span className="trip-emoji">
-                {t.destination.toLowerCase().includes('lisbon')
-                  ? '☀'
-                  : t.destination.toLowerCase().includes('vienna')
-                    ? '♧'
-                    : '↗'}
-              </span>
+              <MapPin size={18} aria-hidden="true" />
               <span>
                 <strong>{t.destination.split(',')[0]}</strong>
                 <small>
@@ -148,36 +131,6 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <button className="new-trip" onClick={() => setDialog('new-trip')}>
-          <Plus size={16} />
-          Plan a new trip
-        </button>
-        <div className="sidebar-bottom">
-          <div className="note-illustration">
-            <Mountain size={33} />
-            <span>✦</span>
-          </div>
-          <h3>
-            Good trips start
-            <br />
-            with a shared idea.
-          </h3>
-          <p>
-            A little less planning.
-            <br />A lot more exploring.
-          </p>
-          <div className="local-note">
-            <span />
-            Local demo · saved in this browser
-          </div>
-        </div>
-        <div className="profile">
-          <span className="avatar jakub">J</span>
-          <div>
-            <strong>Jakub's workspace</strong>
-            <small>Personal portfolio demo</small>
-          </div>
-        </div>
       </aside>
       <div className="main-shell">
         <header className="topbar">
@@ -191,10 +144,6 @@ export default function App() {
           </button>
         </header>
         <main id="main">
-          <div className="eyebrow">
-            <span />
-            MAKE ROOM FOR THE MEMORIES
-          </div>
           {trip ? (
             <>
               <section className="trip-heading">
@@ -214,64 +163,6 @@ export default function App() {
                   Edit trip
                 </button>
               </section>
-              <section className="trip-banner">
-                <div className="banner-copy">
-                  <span className="pill">THE NEXT CHAPTER</span>
-                  <h2>
-                    Different ideas.
-                    <br />
-                    One great adventure.
-                  </h2>
-                  <p>
-                    Collect the possibilities. Vote on your favourites.
-                    <br />
-                    Make a plan everyone is excited about.
-                  </p>
-                  <div className="banner-members">
-                    <div className="avatar-stack">
-                      {trip.members.slice(0, 4).map((m, i) => (
-                        <span key={m} className={`avatar color-${i}`} title={m}>
-                          {m[0].toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
-                    <span>{trip.members.length} travel companions</span>
-                  </div>
-                </div>
-                <div className="travel-art" aria-hidden="true">
-                  <div className="sun" />
-                  <div className="art-caption">
-                    LET'S GO
-                    <br />
-                    <b>{trip.destination.split(',')[0].toUpperCase()}</b>
-                    <ArrowUpRight size={28} />
-                  </div>
-                  <div className="building one">
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                  </div>
-                  <div className="building two">
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                  </div>
-                  <div className="building three">
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                  </div>
-                  <div className="art-hill" />
-                  <div className="art-line" />
-                </div>
-              </section>
               <section className="stats" aria-label="Trip overview">
                 <div>
                   <span className="stat-icon">
@@ -279,7 +170,7 @@ export default function App() {
                   </span>
                   <div>
                     <b>{trip.activities.length}</b>
-                    <span>Ideas to explore</span>
+                    <span>Ideas</span>
                   </div>
                 </div>
                 <div>
@@ -288,7 +179,7 @@ export default function App() {
                   </span>
                   <div>
                     <b>{planned.length}</b>
-                    <span>Added to the plan</span>
+                    <span>Planned</span>
                   </div>
                 </div>
                 <div>
@@ -296,18 +187,15 @@ export default function App() {
                     <CalendarDays size={19} />
                   </span>
                   <div>
-                    <b>
-                      {tripDays(trip).length}
-                      <small> days</small>
-                    </b>
-                    <span>Time for adventure</span>
+                    <b>{tripDays(trip).length}</b>
+                    <span>Days</span>
                   </div>
                 </div>
                 <div>
                   <span className="stat-icon">€</span>
                   <div>
                     <b>{money(planned.reduce((s, a) => s + a.cost, 0))}</b>
-                    <span>Planned activities / person</span>
+                    <span>Cost / person</span>
                   </div>
                 </div>
               </section>
@@ -361,14 +249,9 @@ export default function App() {
                   </button>
                 </div>
                 <div className="collaboration-row">
-                  <p>
-                    {view === 'ideas'
-                      ? 'A wish list becomes a plan, one vote at a time.'
-                      : 'Your adventure, one day at a time.'}
-                  </p>
                   <label>
                     <Users size={14} />
-                    Demo voting as
+                    Demo voter
                     <select
                       aria-label="Demo voting identity"
                       value={member}
@@ -441,24 +324,10 @@ export default function App() {
                             }
                           />
                         ))}
-                        {!query && filter === 'All ideas' && (
-                          <button className="add-card" onClick={() => setDialog('idea')}>
-                            <span>
-                              <Plus size={24} />
-                            </span>
-                            <strong>What's on your wish list?</strong>
-                            <small>A place, a bite, a little adventure.</small>
-                            <b>
-                              Add an idea <ArrowUpRight size={15} />
-                            </b>
-                          </button>
-                        )}
                       </div>
                       {activities.length === 0 && (
                         <p className="empty">
-                          {trip.activities.length
-                            ? 'No ideas match. Try another search or category.'
-                            : 'Your next adventure starts with the first idea.'}
+                          {trip.activities.length ? 'No matching ideas.' : 'No ideas yet.'}
                         </p>
                       )}
                     </>
@@ -505,9 +374,7 @@ export default function App() {
                                 </div>
                               ))}
                             {!planned.some((a) => a.day === day) && (
-                              <p className="day-empty">
-                                A little room for spontaneity. Add an idea from the board.
-                              </p>
+                              <p className="day-empty">No activities planned.</p>
                             )}
                           </div>
                         </section>
@@ -517,10 +384,7 @@ export default function App() {
                 </div>
               </section>
               <footer>
-                <span>
-                  <Check size={13} />
-                  Local demo. Switching companions simulates votes; no live sharing.
-                </span>
+                <span>Local demo · browser only</span>
                 <button className="text-button danger" onClick={() => setDialog('delete-trip')}>
                   <Trash2 size={13} />
                   Delete trip
@@ -530,11 +394,10 @@ export default function App() {
           ) : (
             <section className="empty-workspace">
               <Compass size={48} />
-              <h1>Where shall we go?</h1>
-              <p>Create a trip and start collecting ideas together.</p>
+              <h1>No trips yet</h1>
               <button className="primary" onClick={() => setDialog('new-trip')}>
                 <Plus size={17} />
-                Plan your first trip
+                Create trip
               </button>
             </section>
           )}
@@ -549,11 +412,11 @@ export default function App() {
         <Modal
           title={
             dialog === 'new-trip'
-              ? 'Start a new adventure'
+              ? 'Create trip'
               : dialog === 'edit-trip'
-                ? 'Edit your trip'
+                ? 'Edit trip'
                 : dialog === 'idea'
-                  ? 'A new possibility'
+                  ? 'Add idea'
                   : 'Delete this trip?'
           }
           onClose={close}
@@ -564,10 +427,7 @@ export default function App() {
             <ActivityForm onSave={saveIdea} />
           ) : (
             <>
-              <p>
-                This removes the trip and all its ideas from this browser. Export a backup first if
-                you want to keep a copy.
-              </p>
+              <p>The trip and its ideas will be deleted.</p>
               <div className="dialog-actions">
                 <button className="outline" onClick={close}>
                   Keep trip

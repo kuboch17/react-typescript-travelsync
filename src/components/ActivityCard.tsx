@@ -1,4 +1,4 @@
-import { ArrowUp, MapPin, Trash2, CalendarPlus, Check } from 'lucide-react';
+import { ArrowUp, MapPin, Trash2, CalendarPlus } from 'lucide-react';
 import { formatDate, money, tripDays, type Activity, type Trip } from '../domain/model';
 export function ActivityCard({
   activity,
@@ -35,15 +35,9 @@ export function ActivityCard({
         <MapPin size={14} />
         {activity.location}
       </p>
-      <p className="notes">{activity.notes || 'A new idea for your next adventure.'}</p>
+      {activity.notes && <p className="notes">{activity.notes}</p>}
       <div className="card-meta">
-        <span>{activity.cost === 0 ? 'Free to explore' : `${money(activity.cost)} / person`}</span>
-        {activity.day && (
-          <span className="planned">
-            <Check size={12} />
-            In the plan
-          </span>
-        )}
+        <span>{activity.cost === 0 ? 'Free' : `${money(activity.cost)} / person`}</span>
       </div>
       <div className="card-footer">
         <button
@@ -54,7 +48,6 @@ export function ActivityCard({
         >
           <ArrowUp size={16} />
           <b>{activity.votes.length}</b>
-          <span>{voted ? 'Voted' : 'Vote'}</span>
         </button>
         <label className="schedule">
           <CalendarPlus size={15} />
